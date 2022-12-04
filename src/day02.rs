@@ -49,6 +49,27 @@ score of 15 (8 + 1 + 6).
 What would your total score be if everything goes exactly according to your
 strategy guide?
 */
+/*
+--- Part Two ---
+
+The Elf finishes helping with the tent and sneaks back over to you. "Anyway, the
+second column says how the round needs to end: X means you need to lose, Y means
+you need to end the round in a draw, and Z means you need to win. Good luck!"
+
+The total score is still calculated in the same way, but now you need to figure
+out what shape to choose so the round ends as indicated. The example above now
+goes like this:
+
+    In the first round, your opponent will choose Rock (A), and you need the round to end in a draw (Y), so you also choose Rock. This gives you a score of 1 + 3 = 4.
+    In the second round, your opponent will choose Paper (B), and you choose Rock so you lose (X) with a score of 1 + 0 = 1.
+    In the third round, you will defeat your opponent's Scissors with Rock for a score of 1 + 6 = 7.
+
+Now that you're correctly decrypting the ultra top secret strategy guide, you
+would get a total score of 12.
+
+Following the Elf's instructions for the second column, what would your total
+score be if everything goes exactly according to your strategy guide?
+*/
 
 use anyhow::anyhow;
 use nom::{
@@ -75,17 +96,27 @@ pub enum Outcome {
     Draw,
 }
 
-pub fn parse_input(raw: &str) -> anyhow::Result<Vec<(Shape, Shape)>> {
-    match all_consuming(separated_list1(multispace1, moves_parser))(raw.trim()) {
+pub fn parse_input1(raw: &str) -> anyhow::Result<Vec<(Shape, Shape)>> {
+    match all_consuming(separated_list1(multispace1, shapes_parser))(raw.trim()) {
         Ok((_, lines)) => Ok(lines),
         Err(e) => Err(anyhow!("could not parse input [{}]: {}", e, raw)),
     }
 }
-fn moves_parser(input: &str) -> IResult<&str, (Shape, Shape)> {
-    let (input, (p1, p2)) = separated_pair(move_parser, multispace1, move_parser)(input)?;
+pub fn parse_input2(raw: &str) -> anyhow::Result<Vec<(Shape, Outcome)>> {
+    match all_consuming(separated_list1(multispace1, shape_outcome_parser))(raw.trim()) {
+        Ok((_, lines)) => Ok(lines),
+        Err(e) => Err(anyhow!("could not parse input [{}]: {}", e, raw)),
+    }
+}
+fn shape_outcome_parser(input: &str) -> IResult<&str, (Shape, Outcome)> {
+    let (input, (p1, p2)) = separated_pair(shape_parser, multispace1, outcome_parser)(input)?;
     Ok((input, (p1, p2)))
 }
-fn move_parser(input: &str) -> IResult<&str, Shape> {
+fn shapes_parser(input: &str) -> IResult<&str, (Shape, Shape)> {
+    let (input, (p1, p2)) = separated_pair(shape_parser, multispace1, shape_parser)(input)?;
+    Ok((input, (p1, p2)))
+}
+fn shape_parser(input: &str) -> IResult<&str, Shape> {
     alt((
         value(Shape::Rock, tag("A")),
         value(Shape::Paper, tag("B")),
@@ -96,16 +127,28 @@ fn move_parser(input: &str) -> IResult<&str, Shape> {
     ))(input)
 }
 
-pub fn score(input: &[(Shape, Shape)]) -> i32 {
+fn outcome_parser(input: &str) -> IResult<&str, Outcome> {
+    alt((
+        value(Outcome::Loss, tag("X")),
+        value(Outcome::Draw, tag("Y")),
+        value(Outcome::Win, tag("Z")),
+    ))(input)
+}
+
+pub fn score1(input: &[(Shape, Shape)]) -> i32 {
     input
         .iter()
-        .map(|&(theirs, mine)| score_round(theirs, mine))
+        .map(|&(theirs, mine)| score_shape(mine) + score_outcome(decide_outcome(theirs, mine)))
         .sum()
 }
 
-fn score_round(theirs: Shape, mine: Shape) -> i32 {
-    let outcome = decide_outcome(theirs, mine);
-    score_shape(mine) + score_outcome(outcome)
+pub fn score2(input: &[(Shape, Outcome)]) -> i32 {
+    input
+        .iter()
+        .map(|&(theirs, outcome)| {
+            score_shape(decide_shape(theirs, outcome)) + score_outcome(outcome)
+        })
+        .sum()
 }
 
 fn decide_outcome(theirs: Shape, mine: Shape) -> Outcome {
@@ -119,6 +162,15 @@ fn decide_outcome(theirs: Shape, mine: Shape) -> Outcome {
         (Shape::Rock, Shape::Scissors)
         | (Shape::Paper, Shape::Rock)
         | (Shape::Scissors, Shape::Paper) => Outcome::Loss,
+    }
+}
+
+fn decide_shape(theirs: Shape, outcome: Outcome) -> Shape {
+    match (theirs, outcome) {
+        (_, Outcome::Draw) => theirs,
+        (Shape::Rock, Outcome::Win) | (Shape::Scissors, Outcome::Loss) => Shape::Paper,
+        (Shape::Rock, Outcome::Loss) | (Shape::Paper, Outcome::Win) => Shape::Scissors,
+        (Shape::Paper, Outcome::Loss) | (Shape::Scissors, Outcome::Win) => Shape::Rock,
     }
 }
 
@@ -149,16 +201,24 @@ mod test {
             B X
             C Z
         "#;
-        let input = parse_input(input)?;
-        assert_eq!(score(&input), 15);
+        let input = parse_input1(input)?;
+        assert_eq!(score1(&input), 15);
         Ok(())
     }
 
     #[test]
     fn part1() -> anyhow::Result<()> {
         let input = std::fs::read_to_string("data/day02.input")?;
-        let input = parse_input(&input)?;
-        assert_eq!(score(&input), 71023);
+        let input = parse_input1(&input)?;
+        assert_eq!(score1(&input), 15337);
+        Ok(())
+    }
+
+    #[test]
+    fn part2() -> anyhow::Result<()> {
+        let input = std::fs::read_to_string("data/day02.input")?;
+        let input = parse_input2(&input)?;
+        assert_eq!(score2(&input), 11696);
         Ok(())
     }
 }
