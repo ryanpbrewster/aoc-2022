@@ -61,6 +61,25 @@ Find the Elf carrying the most Calories. How many total Calories is that Elf
 carrying?
  */
 
+/*
+ --- Part Two ---
+
+By the time you calculate the answer to the Elves' question, they've already
+realized that the Elf carrying the most Calories of food might eventually run
+out of snacks.
+
+To avoid this unacceptable situation, the Elves would instead like to know the
+total Calories carried by the top three Elves carrying the most Calories. That
+way, even if one of those Elves runs out of snacks, they still have two backups.
+
+In the example above, the top three Elves are the fourth Elf (with 24000
+Calories), then the third Elf (with 11000 Calories), then the fifth Elf (with
+10000 Calories). The sum of the Calories carried by these three elves is 45000.
+
+Find the top three Elves carrying the most Calories. How many Calories are those
+Elves carrying in total?
+*/
+
 pub fn parse_input(input: &str) -> anyhow::Result<Vec<Vec<i32>>> {
     let mut acc = Vec::new();
     let mut cur = Vec::new();
@@ -73,14 +92,22 @@ pub fn parse_input(input: &str) -> anyhow::Result<Vec<Vec<i32>>> {
         }
     }
     Ok(acc)
- }
+}
 
- pub fn find_max_sum(xs: Vec<Vec<i32>>) -> anyhow::Result<i32> {
-    xs.iter().map(|ys| ys.iter().sum()).max().ok_or_else(|| anyhow::anyhow!("empty input"))
- }
+pub fn find_max_sum(xs: Vec<Vec<i32>>) -> anyhow::Result<i32> {
+    xs.iter()
+        .map(|ys| ys.iter().sum())
+        .max()
+        .ok_or_else(|| anyhow::anyhow!("empty input"))
+}
 
- #[cfg(test)]
- mod test {
+pub fn find_top_k_sum(mut xs: Vec<Vec<i32>>, k: usize) -> anyhow::Result<i32> {
+    xs.sort_by_cached_key(|ys| std::cmp::Reverse(ys.iter().sum::<i32>()));
+    Ok(xs.iter().take(k).map(|ys| ys.iter().sum::<i32>()).sum())
+}
+
+#[cfg(test)]
+mod test {
     use super::*;
 
     #[test]
@@ -113,4 +140,12 @@ pub fn parse_input(input: &str) -> anyhow::Result<Vec<Vec<i32>>> {
         assert_eq!(find_max_sum(input)?, 71023);
         Ok(())
     }
- }
+
+    #[test]
+    fn part2() -> anyhow::Result<()> {
+        let input = std::fs::read_to_string("data/day01.input")?;
+        let input = parse_input(&input)?;
+        assert_eq!(find_top_k_sum(input, 3)?, 206289);
+        Ok(())
+    }
+}
